@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 关键：微信适配 - 禁止缩放消除触摸延迟，固定视口 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+    <title>我们的小世界（七夕篇）</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        grass: '#7CCC65',
+                        house: {
+                            1: '#FF9E9E',
+                            2: '#9EC9FF',
+                            3: '#FFE08C',
+                            4: '#A7E0C8'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .pixel-art {
+                image-rendering: pixelated;
+                image-rendering: -moz-crisp-edges;
+                image-rendering: crisp-edges;
+            }
+            .house-hover {
+                transition: transform 0.3s ease;
+            }
+            .house-hover:hover,
+            .house-hover:active { /* 微信触摸适配：增加active状态，触摸更灵敏 */
+                transform: scale(1.1) translateY(-5px);
+            }
+            .coin {
+                position: absolute;
+                width: 10px;
+                height: 10px;
+                background-color: #FFD700;
+                border-radius: 50%;
+                top: -10px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 20;
+                display: none;
+            }
+            .coin.active {
+                display: block;
+                animation: dropCoin 1s ease-out forwards;
+            }
+            .message {
+                position: absolute;
+                bottom: 40px;
+                left: 50%;
+                transform: translateX(-50%);
+                background-color: rgba(255, 255, 255, 0.9);
+                padding: 8px 12px;
+                border-radius: 4px;
+                font-size: 12px;
+                text-align: center;
+                width: 160px;
+                opacity: 0;
+                transition: opacity 0.5s ease;
+                z-index: 15;
+            }
+            .message.active {
+                opacity: 1;
+            }
+            .modal {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.7);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 100;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.3s ease;
+            }
+            .modal.active {
+                opacity: 1;
+                pointer-events: auto;
+            }
+            .modal-content {
+                max-width: 90%;
+                max-height: 80%;
+                position: relative;
+                transform: scale(0.9);
+                transition: transform 0.3s ease;
+            }
+            .modal.active .modal-content {
+                transform: scale(1);
+            }
+            .close-btn {
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                background-color: rgba(255, 255, 255, 0.8);
+                border: none;
+                width: 30px;
+                height: 30px;
+                border-radius: 50%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                cursor: pointer;
+                z-index: 101;
+                font-size: 16px;
+                /* 微信触摸适配：增加点击区域反馈 */
+                touch-action: manipulation;
+                -webkit-tap-highlight-color: transparent;
+            }
+            #music-tip {
+                position: fixed;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background-color: rgba(0, 0, 0, 0.6);
+                color: white;
+                padding: 6px 14px; /* 微信适配：放大提示框，更易看到 */
+                border-radius: 20px;
+                font-size: 14px; /* 放大字体 */
+                z-index: 20;
+                display: block; /* 微信强制显示：进入页面就提示点击播放 */
+            }
+            
+            @keyframes dropCoin {
+                0% {
+                    top: -10px;
+                    opacity: 1;
+                }
+                70% {
+                    top: 100px;
+                    opacity: 1;
+                }
+                100% {
+                    top: 120px;
+                    opacity: 0;
+                }
+            }
+            
+            /* 微信适配：消除按钮点击高亮 */
+            * {
+                -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+                touch-action: manipulation; /* 禁止双击缩放 */
+            }
+        }
+    </style>
+</head>
+<body class="overflow-hidden h-screen">
+    <!-- 背景音乐：微信需删除autoplay，避免被拦截 -->
+    <audio id="background-music" loop preload="auto">
+        <source src="https://nn-sycdn.kuwo.cn/ff2b2a9b76e928f46fad1f2066229f9f/68b0617d/resource/n1/13/5/4023939713.mp3" type="audio/mpeg">
+        您的浏览器不支持音频播放
+     </audio> <!-- 修复原代码音频标签闭合错误 -->
+    
+    <!-- 音乐提示：微信强制显示，引导点击 -->
+    <div id="music-tip">点击页面任意位置播放音乐</div>
+    
+    <!-- 主背景 -->
+    <div class="relative h-screen w-screen overflow-hidden">
+        <div class="absolute top-0 left-0 right-0 bottom-0">
+            <div class="w-full h-full" 
+                 style="background-image: url('https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAALjYWiwbTgz2wb3duI-coYsnJudifB0AAIZGQAC1AOIVWdBskuPBAZSNgQ.jpg'); 
+                        background-size: cover; 
+                        background-position: center;
+                        background-repeat: no-repeat;"></div>
+        </div>
+        
+        <!-- 四个小房子：微信触摸适配 -->
+        <div class="absolute bottom-1/4 left-0 right-0 flex justify-around px-4 z-10">
+            <!-- 1. 写给你的信 -->
+            <div id="house-1" class="house-hover cursor-pointer flex flex-col items-center" style="touch-action: manipulation;">
+                <div class="w-24 h-24 rounded-t-lg relative" 
+                     style="background-image: url('https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAALjZWiwbhaJERDzGi6oXFTIi4xp929CAAIeGQAC1AOIVfHTe9HefRltNgQ.png'); 
+                            background-size: cover;
+                            background-position: center;"></div>
+                <div class="mt-1 text-sm font-medium text-white shadow-sm">写给你的信</div>
+            </div>
+            
+            <!-- 2. 时间 -->
+            <div id="house-2" class="house-hover cursor-pointer flex flex-col items-center" style="touch-action: manipulation;">
+                <div class="w-24 h-24 rounded-t-lg relative" 
+                     style="background-image: url('https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAALjZmiwbh7ArzcxC6nP8YNGXdUFOnkvAAIfGQAC1AOIVex6Vsh5JX1ZNgQ.png'); 
+                            background-size: cover;
+                            background-position: center;"></div>
+                <div class="mt-1 text-sm font-medium text-white shadow-sm">时间</div>
+            </div>
+            
+            <!-- 3. missu -->
+            <div id="house-3" class="house-hover cursor-pointer flex flex-col items-center" style="touch-action: manipulation;">
+                <div class="w-24 h-24 rounded-t-lg relative" 
+                     style="background-image: url('https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAALjZ2iwbiuBlYVS21HvUx83cyLzr7hhAAIgGQAC1AOIVXQSdbB2gW7XNgQ.png'); 
+                            background-size: cover;
+                            background-position: center;"></div>
+                <div class="mt-1 text-sm font-medium text-white shadow-sm">missu</div>
+            </div>
+            
+            <!-- 4. 许愿池 -->
+            <div id="house-4" class="house-hover cursor-pointer flex flex-col items-center" style="touch-action: manipulation;">
+                <div class="w-24 h-24 rounded-t-lg relative" 
+                     style="background-image: url('https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAALjaGiwbizLksiRwjE2jMKwBYs4nZufAAIhGQAC1AOIVVsr7hlGd0K2NgQ.png'); 
+                            background-size: cover;
+                            background-position: center;"></div>
+                <div class="mt-1 text-sm font-medium text-white shadow-sm">许愿池</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 1. 信件模态框 -->
+    <div id="letter-modal" class="modal">
+        <button class="close-btn" data-modal="letter-modal">×</button>
+        <div class="modal-content bg-white p-6 rounded-xl max-w-md">
+            <h3 class="text-xl font-bold text-pink-500 mb-4 text-center">写给你的信</h3>
+            <div class="text-gray-700 space-y-3 leading-relaxed">
+                <p>亲爱的康康：</p>
+                <p>你不要告诉我你忘了这是一起度过的第几个七夕！这是第四个了！</p>
+                <p>其实也没什么特别想说的（因为我是外放型恋人，有什么情情爱爱的平时我都会直接说滴！爱你宝宝！），突然很想告诉你：和你在一起的每一天，我都觉得好幸运。</p>
+                <p>从我们相遇的那天起，每个平凡的日子好像都多了一层温柔的滤镜——偶尔拌嘴后又忍不住笑出来的瞬间，都成了心里偷偷珍藏的小片段。（是不是很优美的句子嘻嘻O(∩_∩)0）</p>
+                <p>1196天不算短，但我总觉得还不够（是的我是贪心鬼！）我还想和你一起经历更多春夏秋冬，想把每一个“今天”都过成值得回忆的“那天”，想告诉你：遇见你之后，我才明白“安稳的幸福”原来是这种感觉。</p>
+                <p>这首歌是我特地选的，我觉得写的超级好！“我永远爱你到老！”----《小酒窝》</p>
+                <p>未来还长，就慢慢走吧！</p>
+                <p class="text-right mt-6 text-pink-400">小圆圆 2025.8.28</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 2. 时间模态框 -->
+    <div id="days-modal" class="modal">
+        <button class="close-btn" data-modal="days-modal">×</button>
+        <div class="modal-content bg-white p-8 rounded-xl text-center">
+            <div class="text-4xl font-bold text-pink-500 mb-2">1196</div>
+            <div class="text-gray-600">在一起天数</div>
+            <div class="mt-6 text-sm text-gray-500">我永远爱你到老(#^.^#)</div>
+        </div>
+    </div>
+    
+    <!-- 3. missu模态框：照片已配置，微信可正常显示 -->
+    <div id="photo-modal" class="modal">
+        <button class="close-btn" data-modal="photo-modal">×</button>
+        <div class="modal-content">
+            <img src="https://img.remit.ee/api/file/BQACAgUAAyEGAASHRsPbAALjd2iwdqoToDjg8SO7IrYQYdtB_jjBAAJJGQAC1AOIVSdBpOiU7-CJNgQ.jpg" 
+                 alt="每看到这张照片都好想你" 
+                 class="max-w-full max-h-[80vh] rounded-lg shadow-xl object-contain">
+        </div>
+    </div>
+    
+    <!-- 4. 许愿池模态框 -->
+    <div id="wish-modal" class="modal">
+        <button class="close-btn" data-modal="wish-modal">×</button>
+        <div class="modal-content bg-blue-50 p-6 rounded-xl">
+            <h3 class="text-center text-lg font-medium mb-4">许愿池（也可以叫小情话？</h3>
+            <div class="relative w-64 h-64 mx-auto bg-stone-200 rounded-lg border-4 border-stone-400 pixel-art">
+                <div class="absolute bottom-0 left-0 right-0 h-32 bg-blue-300"></div>
+                <div class="absolute bottom-28 left-4 right-4 h-1 bg-blue-400 opacity-50"></div>
+                <div class="absolute bottom-24 left-8 right-8 h-1 bg-blue-400 opacity-40"></div>
+                <div class="absolute bottom-20 left-12 right-12 h-1 bg-blue-400 opacity-30"></div>
+                <div class="absolute top-0 left-0 w-full h-4 bg-stone-500"></div>
+                <div class="absolute top-4 left-4 w-8 h-8 bg-stone-300 rounded-sm"></div>
+                <div class="absolute top-4 right-4 w-8 h-8 bg-stone-300 rounded-sm"></div>
+                <div id="coin-slot" class="absolute top-16 left-1/2 transform -translate-x-1/2 w-8 h-8 bg-stone-400 rounded-full flex items-center justify-center cursor-pointer" style="touch-action: manipulation;">
+                    <div class="w-4 h-4 bg-yellow-300 rounded-full"></div>
+                </div>
+                <div class="coin"></div>
+                <div class="message"></div>
+            </div>
+            <p class="text-center text-sm text-gray-500 mt-4">点击投币口许下心愿</p>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // -------------------------- 1. 微信专属音乐播放逻辑（核心优化） --------------------------
+            const music = document.getElementById('background-music');
+            const musicTip = document.getElementById('music-tip');
+            music.volume = 0.3;
+            let musicPlayed = false;
+            
+            // 微信必须通过“用户主动触摸/点击”触发，先加载音频
+            function loadAndPlayMusic() {
+                if (musicPlayed) return;
+                
+                // 微信兼容：先加载音频资源
+                music.load();
+                music.play().then(() => {
+                    musicPlayed = true;
+                    musicTip.style.display = 'none';
+                }).catch(() => {
+                    // 极端情况：再次提示（如用户禁用音频）
+                    musicTip.textContent = '请再点击一次播放音乐';
+                });
+            }
+            
+            // 绑定微信所有触发方式：点击+触摸（覆盖所有场景）
+            document.body.addEventListener('click', loadAndPlayMusic);
+            document.body.addEventListener('touchstart', loadAndPlayMusic); // 手机触摸优先
+            document.body.addEventListener('touchend', loadAndPlayMusic);
+            
+            // -------------------------- 2. 房子点击（微信触摸适配） --------------------------
+            // 写给你的信
+            document.getElementById('house-1').addEventListener('click', () => {
+                loadAndPlayMusic(); // 点击房子
+                                document.getElementById('letter-modal').classList.add('active');
+            });
+            // 时间
+            document.getElementById('house-2').addEventListener('click', () => {
+                loadAndPlayMusic(); // 点击时同步尝试播放音乐（避免用户没点过页面）
+                document.getElementById('days-modal').classList.add('active');
+            });
+            // missu
+            document.getElementById('house-3').addEventListener('click', () => {
+                loadAndPlayMusic();
+                document.getElementById('photo-modal').classList.add('active');
+            });
+            // 许愿池
+            document.getElementById('house-4').addEventListener('click', () => {
+                loadAndPlayMusic();
+                document.getElementById('wish-modal').classList.add('active');
+            });
+            
+            // -------------------------- 3. 关闭模态框（微信触摸适配） --------------------------
+            document.querySelectorAll('.close-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const modalId = this.getAttribute('data-modal');
+                    document.getElementById(modalId).classList.remove('active');
+                });
+                // 额外添加触摸事件，确保微信里点击关闭按钮更灵敏
+                btn.addEventListener('touchstart', function() {
+                    const modalId = this.getAttribute('data-modal');
+                    document.getElementById(modalId).classList.remove('active');
+                });
+            });
+            
+            // -------------------------- 4. 许愿池投币动画+随机文案（核心交互） --------------------------
+            const happyTexts = [
+                "十指相扣的时候 生命线就会交错",
+                "如果你问我幸福吗 我会毫不犹豫的说 遇见你很幸福",
+                "和你在一起就是幸福",
+                "直到有一天我的实况出现你的声音",
+                "拥抱是为了弥补人类右胸腔没有的心跳",
+                "舒服也是一种幸福!",
+                "好运会降临在你爱上自己的每一刻",
+                "深深的话我们浅浅的说",
+                "世界是冰窟 还好我有你用爱织成的毛毯",
+                "我疯狂记录幸福的瞬间，也不止一次感慨你的出现。",
+                "相逢的幸福在于照亮彼此",
+                "幸福的秘诀是找一个一起吃饭好好说话的人",
+                "人和人之间的滤镜是一双偏爱的眼睛",
+                "只记得那天阳光明媚",
+                "幸福有个小名，叫做普通的一天。",
+                "直到幸福触手可及 原来早已被幸福围绕",
+                "七夕的风很甜，因为是和你一起吹的",
+                "第四个七夕，下一个还要和你一起过" // 新增七夕专属文案，贴合主题
+            ];
+            
+            const coinSlot = document.getElementById('coin-slot');
+            const coin = document.querySelector('.coin');
+            const message = document.querySelector('.message');
+            
+            // 投币交互（同时绑定点击和触摸，微信适配）
+            coinSlot.addEventListener('click', triggerWish);
+            coinSlot.addEventListener('touchstart', triggerWish);
+            
+            function triggerWish() {
+                // 重置状态，确保每次点击都能重新触发动画
+                coin.classList.remove('active');
+                message.classList.remove('active');
+                void coin.offsetWidth; // 触发浏览器重绘，解决动画重复执行问题
+                
+                // 显示硬币掉落动画
+                coin.classList.add('active');
+                
+                // 随机选择七夕专属文案
+                const randomIdx = Math.floor(Math.random() * happyTexts.length);
+                message.textContent = happyTexts[randomIdx];
+                
+                // 同步显示文案（等硬币掉落到一半时出现，增强体验）
+                setTimeout(() => {
+                    message.classList.add('active');
+                    // 5秒后自动隐藏文案，避免遮挡
+                    setTimeout(() => message.classList.remove('active'), 5000);
+                }, 1000);
+            }
+        });
+    </script>
